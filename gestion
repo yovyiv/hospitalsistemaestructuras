@@ -1,0 +1,290 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <queue>
+#include <stack>
+
+using namespace std;
+
+/* -------------------------------------
+   MedicalRecordNode (nodo lista simple)
+   ------------------------------------- */
+struct MedicalRecordNode {
+    string date;
+    string note;
+    MedicalRecordNode* next;
+
+    MedicalRecordNode(const string& d, const string& n)
+        : date(d), note(n), next(nullptr) {}
+};
+
+/* -------------------------------------
+   MedicalHistory (lista enlazada)
+   ------------------------------------- */
+class MedicalHistory {
+    MedicalRecordNode* head;
+
+public:
+    MedicalHistory() : head(nullptr) {}
+
+    ~MedicalHistory() {
+        MedicalRecordNode* cur = head;
+        while (cur) {
+            MedicalRecordNode* tmp = cur->next;
+            delete cur;
+            cur = tmp;
+        }
+    }
+
+    void addRecord(const string& date, const string& note) {
+        MedicalRecordNode* node = new MedicalRecordNode(date, note);
+        if (!head) {
+            head = node;
+            return;
+        }
+        MedicalRecordNode* cur = head;
+        while (cur->next) cur = cur->next;
+        cur->next = node;
+    }
+
+    void printHistory() const {
+        if (!head) {
+            cout << "  (sin historial)\n";
+            return;
+        }
+        MedicalRecordNode* cur = head;
+        while (cur) {
+            cout << "  [" << cur->date << "] " << cur->note << "\n";
+            cur = cur->next;
+        }
+    }
+};
+
+/* -------------------------------------
+   Patient
+   ------------------------------------- */
+struct Patient {
+    int id;
+    string name;
+    int age;
+    int floorAssigned;
+    int roomAssigned;
+    MedicalHistory history;
+
+    Patient(int _id = -1, const string& _name = "", int _age = 0)
+        : id(_id), name(_name), age(_age),
+          floorAssigned(-1), roomAssigned(-1) {}
+};
+
+/* -------------------------------------
+   Room
+   ------------------------------------- */
+struct Room {
+    bool occupied;
+    int patientId;
+
+    Room() : occupied(false), patientId(-1) {}
+};
+
+/* -------------------------------------
+   Hospital
+   ------------------------------------- */
+class Hospital {
+
+    vector<Patient> patients;
+    vector<vector<Room>> rooms;
+    queue<int> waitingQueue;
+    stack<string> urgentTasks;
+    int nextPatientId;
+
+public:
+    Hospital(int floors = 2, int roomsPerFloor = 3)
+        : nextPatientId(1) {
+        rooms.resize(floors, vector<Room>(roomsPerFloor));
+    }
+
+    int addPatient(const string& name, int age) {
+        int id = nextPatientId++;
+        patients.emplace_back(id, name, age);
+        cout << "Paciente registrado. ID = " << id << "\n";
+        return id;
+    }
+
+    int findPatientIndex(int patientId) {
+        for (int i = 0; i < (int)patients.size(); i++)
+            if (patients[i].id == patientId)
+                return i;
+        return -1;
+    }
+
+    bool addRecordToPatient(int id, const string& date, const string& note) {
+        int idx = findPatientIndex(id);
+        if (idx == -1) return false;
+        patients[idx].history.addRecord(date, note);
+        return true;
+    }
+
+    void enqueuePatient(int id) {
+        if (findPatientIndex(id) == -1) {
+            cout << "ID no existe.\n";
+            return;
+        }
+        waitingQueue.push(id);
+        cout << "Paciente " << id << " añadido a cola.\n";
+    }
+
+    int dequeuePatient() {
+        if (waitingQueue.empty()) {
+            cout << "Cola vacía.\n";
+            return -1;
+        }
+        int id = waitingQueue.front();
+        waitingQueue.pop();
+        cout << "Atendiendo paciente " << id << "\n";
+        return id;
+    }
+
+    void pushUrgentTask(const string& t) {
+        urgentTasks.push(t);
+        cout << "Tarea urgente añadida: " << t << "\n";
+    }
+
+    void popUrgentTask() {
+        if (urgentTasks.empty()) {
+            cout << "No hay urgencias.\n";
+            return;
+        }
+        cout << "Ejecutando urgente: " << urgentTasks.top() << "\n";
+        urgentTasks.pop();
+    }
+
+    bool assignToRoom(int patientId, int floor, int roomNum) {
+        if (floor < 0 || floor >= (int)rooms.size()) return false;
+        if (roomNum < 0 || roomNum >= (int)rooms[floor].size()) return false;
+
+        if (rooms[floor][roomNum].occupied) return false;
+
+        int idx = findPatientIndex(patientId);
+        if (idx == -1) return false;
+
+        rooms[floor][roomNum].occupied = true;
+        rooms[floor][roomNum].patientId = patientId;
+
+        patients[idx].floorAssigned = floor;
+        patients[idx].roomAssigned = roomNum;
+
+        cout << "Paciente " << patientId << " asignado a Piso "
+             << floor << " Hab " << roomNum << "\n";
+
+        return true;
+    }
+
+    bool dischargePatient(int id) {
+        int idx = findPatientIndex(id);
+        if (idx == -1) return false;
+
+        int f = patients[idx].floorAssigned;
+        int r = patients[idx].roomAssigned;
+
+        if (f >= 0 && r >= 0) {
+            rooms[f][r].occupied = false;
+            rooms[f][r].patientId = -1;
+        }
+
+        patients[idx].floorAssigned = -1;
+        patients[idx].roomAssigned = -1;
+
+        cout << "Paciente " << id << " dado de alta.\n";
+        return true;
+    }
+
+    void printStatus() {
+        cout << "\n=== Estado del Hospital ===\n";
+        for (int f = 0; f < (int)rooms.size(); f++) {
+            cout << " Piso " << f << ": ";
+            for (int r = 0; r < (int)rooms[f].size(); r++) {
+                if (rooms[f][r].occupied) {
+                    cout << "[P" << rooms[f][r].patientId << "] ";
+                } else {
+                    cout << "[libre] ";
+                }
+            }
+            cout << "\n";
+        }
+
+        cout << " Cola: ";
+        if (waitingQueue.empty()) cout << "(vacía)\n";
+        else {
+            queue<int> tmp = waitingQueue;
+            while (!tmp.empty()) {
+                cout << tmp.front() << " ";
+                tmp.pop();
+            }
+            cout << "\n";
+        }
+
+        cout << " Urgencias: ";
+        if (urgentTasks.empty()) cout << "(ninguna)\n";
+        else cout << urgentTasks.top() << "\n";
+    }
+
+    void printPatient(int id) {
+        int idx = findPatientIndex(id);
+        if (idx == -1) {
+            cout << "Paciente no encontrado.\n";
+            return;
+        }
+
+        Patient& p = patients[idx];
+        cout << "Paciente ID: " << p.id
+             << " Nombre: " << p.name
+             << " Edad: " << p.age << "\n";
+
+        cout << " Ubicación: ";
+        if (p.floorAssigned >= 0)
+            cout << "Piso " << p.floorAssigned
+                 << " Hab " << p.roomAssigned << "\n";
+        else
+            cout << "No asignado\n";
+
+        cout << " Historial:\n";
+        p.history.printHistory();
+    }
+};
+
+/* -------------------------------------
+   MAIN (ejemplo de uso)
+   ------------------------------------- */
+int main() {
+    Hospital hosp(2, 3);
+
+    int a = hosp.addPatient("Ana Perez", 30);
+    int b = hosp.addPatient("Luis Gomez", 45);
+    int c = hosp.addPatient("Maria Diaz", 27);
+
+    hosp.addRecordToPatient(a, "2025-11-30", "Ingreso por fiebre.");
+    hosp.addRecordToPatient(a, "2025-12-01", "Mejoría general.");
+    hosp.addRecordToPatient(b, "2025-12-01", "Dolor abdominal.");
+
+    hosp.enqueuePatient(a);
+    hosp.enqueuePatient(b);
+    hosp.enqueuePatient(c);
+
+    hosp.pushUrgentTask("Revisar presión al paciente 2");
+    hosp.pushUrgentTask("Administrar O2 al paciente 3");
+
+    hosp.printStatus();
+
+    int atendido = hosp.dequeuePatient();
+    if (atendido != -1)
+        hosp.assignToRoom(atendido, 0, 1);
+
+    hosp.popUrgentTask();
+    hosp.printPatient(a);
+
+    hosp.dischargePatient(a);
+
+    hosp.printStatus();
+
+    return 0;
+}
