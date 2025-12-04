@@ -6,7 +6,7 @@
 using namespace std;
 
 /* ---------------------------------------------------
-   Nodo del historial (LISTA ENLAZADA)
+   Nodo del historial (lista)
 --------------------------------------------------- */
 class MedicalRecordNode {
 public:
@@ -66,7 +66,7 @@ public:
     int id;
     string nombre;
     int edad;
-    string condicion;     // ✔ agregado
+    string condicion;
     int piso;
     int habitacion;
     HistorialPila historial;
@@ -166,7 +166,7 @@ public:
     }
 
     /* -----------------------------------------
-       Liberar habitación
+       Liberar habitacion
     ----------------------------------------- */
     void liberarHabitacion(int id) {
         Paciente* p = buscar(id);
@@ -268,11 +268,11 @@ public:
 };
 
 /* ---------------------------------------------------
-   MAIN CON MENÚ COMPLETO
+   MAIN CON MENu COMPLETO
 --------------------------------------------------- */
 
 int main() {
-    Hospital h(2, 3); // 2 pisos, 3 habitaciones cada uno
+    Hospital h(2, 3); // 2 pisos 3 habitaciones
     int op;
 
     while (true) {
