@@ -109,7 +109,7 @@ class Hospital {
 private:
     vector<Paciente*> pacientes;
 
-    // ✔ MATRIZ de habitaciones: pisos × habitaciones
+    //MATRIZ de habitaciones: pisos × habitaciones
     vector<vector<Habitacion>> matrizHab;
 
     queue<Paciente*> cola;
