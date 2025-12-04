@@ -297,13 +297,20 @@ int main() {
 
         switch (op) {
         case 1:
-            cout << "ID: "; cin >> id;
-            cout << "Nombre: "; cin >> nombre;
-            cout << "Edad: "; cin >> edad;
-            cout << "Condicion: "; cin >> cond;
+            cout << "ID: ";
+            cin >> id;
+            cin.ignore();  
+            cout << "Nombre: ";
+            getline(cin, nombre);
+            cout << "Edad: ";
+            cin >> edad;
+            cin.ignore();  
+            cout << "Condicion: ";
+            getline(cin, cond);
+    
             h.registrarPaciente(id, nombre, edad, cond);
             break;
-
+    
         case 2:
             cout << "ID: "; cin >> id;
             h.asignarHabitacion(id);
