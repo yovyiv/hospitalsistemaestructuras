@@ -1,290 +1,352 @@
 #include <iostream>
 #include <string>
-#include <vector>
 #include <queue>
 #include <stack>
-
+#include <vector>
 using namespace std;
 
-/* -------------------------------------
-   MedicalRecordNode (nodo lista simple)
-   ------------------------------------- */
-struct MedicalRecordNode {
-    string date;
-    string note;
+/* ---------------------------------------------------
+   Nodo del historial (LISTA ENLAZADA)
+--------------------------------------------------- */
+class MedicalRecordNode {
+public:
+    string fecha;
+    string nota;
     MedicalRecordNode* next;
 
-    MedicalRecordNode(const string& d, const string& n)
-        : date(d), note(n), next(nullptr) {}
+    MedicalRecordNode(string f, string n) {
+        fecha = f;
+        nota = n;
+        next = nullptr;
+    }
 };
 
-/* -------------------------------------
-   MedicalHistory (lista enlazada)
-   ------------------------------------- */
-class MedicalHistory {
+/* ---------------------------------------------------
+   Historial médico (pila usando lista enlazada)
+--------------------------------------------------- */
+class HistorialPila {
+private:
     MedicalRecordNode* head;
 
 public:
-    MedicalHistory() : head(nullptr) {}
+    HistorialPila() { head = nullptr; }
 
-    ~MedicalHistory() {
-        MedicalRecordNode* cur = head;
-        while (cur) {
-            MedicalRecordNode* tmp = cur->next;
-            delete cur;
-            cur = tmp;
-        }
+    void push(string fecha, string nota) {
+        MedicalRecordNode* nuevo = new MedicalRecordNode(fecha, nota);
+        nuevo->next = head;
+        head = nuevo;
     }
 
-    void addRecord(const string& date, const string& note) {
-        MedicalRecordNode* node = new MedicalRecordNode(date, note);
-        if (!head) {
-            head = node;
-            return;
-        }
-        MedicalRecordNode* cur = head;
-        while (cur->next) cur = cur->next;
-        cur->next = node;
+    void pop() {
+        if (!head) return;
+        MedicalRecordNode* temp = head;
+        head = head->next;
+        delete temp;
     }
 
-    void printHistory() const {
+    void mostrar() const {
         if (!head) {
             cout << "  (sin historial)\n";
             return;
         }
-        MedicalRecordNode* cur = head;
-        while (cur) {
-            cout << "  [" << cur->date << "] " << cur->note << "\n";
-            cur = cur->next;
+
+        MedicalRecordNode* aux = head;
+        while (aux) {
+            cout << "   - " << aux->fecha << ": " << aux->nota << "\n";
+            aux = aux->next;
         }
     }
 };
 
-/* -------------------------------------
-   Patient
-   ------------------------------------- */
-struct Patient {
+/* ---------------------------------------------------
+   Clase Paciente
+--------------------------------------------------- */
+class Paciente {
+public:
     int id;
-    string name;
-    int age;
-    int floorAssigned;
-    int roomAssigned;
-    MedicalHistory history;
+    string nombre;
+    int edad;
+    string condicion;     // ✔ agregado
+    int piso;
+    int habitacion;
+    HistorialPila historial;
 
-    Patient(int _id = -1, const string& _name = "", int _age = 0)
-        : id(_id), name(_name), age(_age),
-          floorAssigned(-1), roomAssigned(-1) {}
+    Paciente(int i, string n, int e, string c)
+        : id(i), nombre(n), edad(e), condicion(c),
+          piso(-1), habitacion(-1) {}
+
+    void mostrar() {
+        cout << "Paciente #" << id << " - " << nombre
+             << " (" << edad << " años) Condicion: " << condicion << "\n";
+        if (piso >= 0)
+            cout << "  Ubicación: Piso " << piso << ", Hab " << habitacion << "\n";
+        else
+            cout << "  Ubicación: No asignada\n";
+
+        cout << "  Historial:\n";
+        historial.mostrar();
+    }
 };
 
-/* -------------------------------------
-   Room
-   ------------------------------------- */
-struct Room {
-    bool occupied;
-    int patientId;
+/* ---------------------------------------------------
+   Habitacion
+--------------------------------------------------- */
+class Habitacion {
+public:
+    bool ocupada;
+    int pacienteID;
 
-    Room() : occupied(false), patientId(-1) {}
+    Habitacion() {
+        ocupada = false;
+        pacienteID = -1;
+    }
 };
 
-/* -------------------------------------
-   Hospital
-   ------------------------------------- */
+/* ---------------------------------------------------
+   Clase Hospital (usa MATRIZ)
+--------------------------------------------------- */
 class Hospital {
+private:
+    vector<Paciente*> pacientes;
 
-    vector<Patient> patients;
-    vector<vector<Room>> rooms;
-    queue<int> waitingQueue;
-    stack<string> urgentTasks;
-    int nextPatientId;
+    // ✔ MATRIZ de habitaciones: pisos × habitaciones
+    vector<vector<Habitacion>> matrizHab;
+
+    queue<Paciente*> cola;
+    stack<string> acciones;
 
 public:
-    Hospital(int floors = 2, int roomsPerFloor = 3)
-        : nextPatientId(1) {
-        rooms.resize(floors, vector<Room>(roomsPerFloor));
+    Hospital(int pisos, int habXpisos) {
+        matrizHab.resize(pisos, vector<Habitacion>(habXpisos));
     }
 
-    int addPatient(const string& name, int age) {
-        int id = nextPatientId++;
-        patients.emplace_back(id, name, age);
-        cout << "Paciente registrado. ID = " << id << "\n";
-        return id;
+    /* -----------------------------------------
+       Registrar Paciente
+    ----------------------------------------- */
+    void registrarPaciente(int id, string nombre, int edad, string condicion) {
+        pacientes.push_back(new Paciente(id, nombre, edad, condicion));
+        acciones.push("Registro de paciente");
+        cout << "Paciente registrado correctamente.\n";
     }
 
-    int findPatientIndex(int patientId) {
-        for (int i = 0; i < (int)patients.size(); i++)
-            if (patients[i].id == patientId)
-                return i;
-        return -1;
+    Paciente* buscar(int id) {
+        for (auto p : pacientes)
+            if (p->id == id) return p;
+        return nullptr;
     }
 
-    bool addRecordToPatient(int id, const string& date, const string& note) {
-        int idx = findPatientIndex(id);
-        if (idx == -1) return false;
-        patients[idx].history.addRecord(date, note);
-        return true;
-    }
-
-    void enqueuePatient(int id) {
-        if (findPatientIndex(id) == -1) {
-            cout << "ID no existe.\n";
-            return;
-        }
-        waitingQueue.push(id);
-        cout << "Paciente " << id << " añadido a cola.\n";
-    }
-
-    int dequeuePatient() {
-        if (waitingQueue.empty()) {
-            cout << "Cola vacía.\n";
-            return -1;
-        }
-        int id = waitingQueue.front();
-        waitingQueue.pop();
-        cout << "Atendiendo paciente " << id << "\n";
-        return id;
-    }
-
-    void pushUrgentTask(const string& t) {
-        urgentTasks.push(t);
-        cout << "Tarea urgente añadida: " << t << "\n";
-    }
-
-    void popUrgentTask() {
-        if (urgentTasks.empty()) {
-            cout << "No hay urgencias.\n";
-            return;
-        }
-        cout << "Ejecutando urgente: " << urgentTasks.top() << "\n";
-        urgentTasks.pop();
-    }
-
-    bool assignToRoom(int patientId, int floor, int roomNum) {
-        if (floor < 0 || floor >= (int)rooms.size()) return false;
-        if (roomNum < 0 || roomNum >= (int)rooms[floor].size()) return false;
-
-        if (rooms[floor][roomNum].occupied) return false;
-
-        int idx = findPatientIndex(patientId);
-        if (idx == -1) return false;
-
-        rooms[floor][roomNum].occupied = true;
-        rooms[floor][roomNum].patientId = patientId;
-
-        patients[idx].floorAssigned = floor;
-        patients[idx].roomAssigned = roomNum;
-
-        cout << "Paciente " << patientId << " asignado a Piso "
-             << floor << " Hab " << roomNum << "\n";
-
-        return true;
-    }
-
-    bool dischargePatient(int id) {
-        int idx = findPatientIndex(id);
-        if (idx == -1) return false;
-
-        int f = patients[idx].floorAssigned;
-        int r = patients[idx].roomAssigned;
-
-        if (f >= 0 && r >= 0) {
-            rooms[f][r].occupied = false;
-            rooms[f][r].patientId = -1;
-        }
-
-        patients[idx].floorAssigned = -1;
-        patients[idx].roomAssigned = -1;
-
-        cout << "Paciente " << id << " dado de alta.\n";
-        return true;
-    }
-
-    void printStatus() {
-        cout << "\n=== Estado del Hospital ===\n";
-        for (int f = 0; f < (int)rooms.size(); f++) {
-            cout << " Piso " << f << ": ";
-            for (int r = 0; r < (int)rooms[f].size(); r++) {
-                if (rooms[f][r].occupied) {
-                    cout << "[P" << rooms[f][r].patientId << "] ";
-                } else {
-                    cout << "[libre] ";
-                }
-            }
-            cout << "\n";
-        }
-
-        cout << " Cola: ";
-        if (waitingQueue.empty()) cout << "(vacía)\n";
-        else {
-            queue<int> tmp = waitingQueue;
-            while (!tmp.empty()) {
-                cout << tmp.front() << " ";
-                tmp.pop();
-            }
-            cout << "\n";
-        }
-
-        cout << " Urgencias: ";
-        if (urgentTasks.empty()) cout << "(ninguna)\n";
-        else cout << urgentTasks.top() << "\n";
-    }
-
-    void printPatient(int id) {
-        int idx = findPatientIndex(id);
-        if (idx == -1) {
+    /* -----------------------------------------
+       Asignar a habitación (MATRIZ)
+    ----------------------------------------- */
+    void asignarHabitacion(int id) {
+        Paciente* p = buscar(id);
+        if (!p) {
             cout << "Paciente no encontrado.\n";
             return;
         }
 
-        Patient& p = patients[idx];
-        cout << "Paciente ID: " << p.id
-             << " Nombre: " << p.name
-             << " Edad: " << p.age << "\n";
+        for (int i = 1; i < matrizHab.size(); i++) {
+            for (int j = 1; j < matrizHab[i].size(); j++) {
+                if (!matrizHab[i][j].ocupada) {
+                    matrizHab[i][j].ocupada = true;
+                    matrizHab[i][j].pacienteID = id;
 
-        cout << " Ubicación: ";
-        if (p.floorAssigned >= 0)
-            cout << "Piso " << p.floorAssigned
-                 << " Hab " << p.roomAssigned << "\n";
-        else
-            cout << "No asignado\n";
+                    p->piso = i;
+                    p->habitacion = j;
 
-        cout << " Historial:\n";
-        p.history.printHistory();
+                    acciones.push("Asignación de habitación");
+
+                    cout << "Asignado a Piso " << i << ", Habitación " << j << "\n";
+                    return;
+                }
+            }
+        }
+
+        cout << "No hay habitaciones disponibles.\n";
+    }
+
+    /* -----------------------------------------
+       Liberar habitación
+    ----------------------------------------- */
+    void liberarHabitacion(int id) {
+        Paciente* p = buscar(id);
+        if (!p || p->piso < 0) {
+            cout << "El paciente no tiene habitación.\n";
+            return;
+        }
+
+        matrizHab[p->piso][p->habitacion].ocupada = false;
+        matrizHab[p->piso][p->habitacion].pacienteID = -1;
+
+        p->piso = -1;
+        p->habitacion = -1;
+
+        acciones.push("Liberación de habitación");
+
+        cout << "Habitación liberada.\n";
+    }
+
+    /* -----------------------------------------
+       Cola de turnos
+    ----------------------------------------- */
+    void agregarATurno(int id) {
+        Paciente* p = buscar(id);
+        if (!p) {
+            cout << "Paciente no encontrado.\n";
+            return;
+        }
+        cola.push(p);
+        acciones.push("Agregar a turno");
+        cout << "Paciente añadido a la cola.\n";
+    }
+
+    void atenderTurno() {
+        if (cola.empty()) {
+            cout << "No hay pacientes en cola.\n";
+            return;
+        }
+
+        Paciente* p = cola.front();
+        cola.pop();
+
+        acciones.push("Atender turno");
+
+        cout << "Atendiendo a: " << p->nombre << "\n";
+    }
+
+    /* -----------------------------------------
+       Historial
+    ----------------------------------------- */
+    void agregarHistorial(int id, string fecha, string nota) {
+        Paciente* p = buscar(id);
+        if (!p) {
+            cout << "Paciente no encontrado.\n";
+            return;
+        }
+
+        p->historial.push(fecha, nota);
+        acciones.push("Agregar historial");
+
+        cout << "Historial añadido.\n";
+    }
+
+    /* -----------------------------------------
+       DESHACER
+    ----------------------------------------- */
+    void deshacer() {
+        if (acciones.empty()) {
+            cout << "Nada para deshacer.\n";
+            return;
+        }
+
+        cout << "Deshaciendo: " << acciones.top() << "\n";
+        acciones.pop();
+    }
+
+    /* -----------------------------------------
+       Mostrar datos
+    ----------------------------------------- */
+    void mostrarDatos() {
+        cout << "\n=== PACIENTES ===\n";
+        for (auto p : pacientes) {
+            p->mostrar();
+            cout << "\n";
+        }
+
+        cout << "\n=== MATRIZ DE HABITACIONES ===\n";
+        for (int i = 0; i < matrizHab.size(); i++) {
+            cout << "Piso " << i << ": ";
+            for (int j = 0; j < matrizHab[i].size(); j++) {
+                cout << (matrizHab[i][j].ocupada ? "[X] " : "[ ] ");
+            }
+            cout << "\n";
+        }
+
+        cout << "\nEn cola: " << cola.size() << " pacientes\n";
+        cout << "Acciones por deshacer: " << acciones.size() << "\n";
     }
 };
 
-/* -------------------------------------
-   MAIN (ejemplo de uso)
-   ------------------------------------- */
+/* ---------------------------------------------------
+   MAIN CON MENÚ COMPLETO
+--------------------------------------------------- */
+
 int main() {
-    Hospital hosp(2, 3);
+    Hospital h(2, 3); // 2 pisos, 3 habitaciones cada uno
+    int op;
 
-    int a = hosp.addPatient("Ana Perez", 30);
-    int b = hosp.addPatient("Luis Gomez", 45);
-    int c = hosp.addPatient("Maria Diaz", 27);
+    while (true) {
+        cout << "\n--- MENU ---\n"
+             << "1 Registrar paciente\n"
+             << "2 Asignar habitación\n"
+             << "3 Liberar habitación\n"
+             << "4 Agregar a cola\n"
+             << "5 Atender turno\n"
+             << "6 Agregar historial\n"
+             << "7 Ver historial paciente\n"
+             << "8 Ver datos del hospital\n"
+             << "9 Deshacer última acción\n"
+             << "0 Salir\n"
+             << "Opción: ";
+        cin >> op;
 
-    hosp.addRecordToPatient(a, "2025-11-30", "Ingreso por fiebre.");
-    hosp.addRecordToPatient(a, "2025-12-01", "Mejoría general.");
-    hosp.addRecordToPatient(b, "2025-12-01", "Dolor abdominal.");
+        if (op == 0) break;
 
-    hosp.enqueuePatient(a);
-    hosp.enqueuePatient(b);
-    hosp.enqueuePatient(c);
+        int id, edad;
+        string nombre, cond, fecha, nota;
 
-    hosp.pushUrgentTask("Revisar presión al paciente 2");
-    hosp.pushUrgentTask("Administrar O2 al paciente 3");
+        switch (op) {
+        case 1:
+            cout << "ID: "; cin >> id;
+            cout << "Nombre: "; cin >> nombre;
+            cout << "Edad: "; cin >> edad;
+            cout << "Condición: "; cin >> cond;
+            h.registrarPaciente(id, nombre, edad, cond);
+            break;
 
-    hosp.printStatus();
+        case 2:
+            cout << "ID: "; cin >> id;
+            h.asignarHabitacion(id);
+            break;
 
-    int atendido = hosp.dequeuePatient();
-    if (atendido != -1)
-        hosp.assignToRoom(atendido, 0, 1);
+        case 3:
+            cout << "ID: "; cin >> id;
+            h.liberarHabitacion(id);
+            break;
 
-    hosp.popUrgentTask();
-    hosp.printPatient(a);
+        case 4:
+            cout << "ID: "; cin >> id;
+            h.agregarATurno(id);
+            break;
 
-    hosp.dischargePatient(a);
+        case 5:
+            h.atenderTurno();
+            break;
 
-    hosp.printStatus();
+        case 6:
+            cout << "ID: "; cin >> id;
+            cout << "Fecha: "; cin >> fecha;
+            cout << "Nota: "; cin >> nota;
+            h.agregarHistorial(id, fecha, nota);
+            break;
+
+        case 7:
+            cout << "ID: "; cin >> id;
+            if (Paciente* p = h.buscar(id))
+                p->mostrar();
+            else
+                cout << "No encontrado.\n";
+            break;
+
+        case 8:
+            h.mostrarDatos();
+            break;
+
+        case 9:
+            h.deshacer();
+            break;
+        }
+    }
 
     return 0;
 }
